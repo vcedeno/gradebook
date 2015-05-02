@@ -161,12 +161,12 @@ class GradeBookBlock(XBlock):
         #assert self.is_course_staff()
         module = StudentModule.objects.get(pk=request.params['module_id'])
         state = json.loads(module.state)
-        state['score'] = 13
+        state['score'] = watched_count
         state['score_published'] = True    # see student_view
         module.state = json.dumps(state)
 
         self.runtime.publish(self, 'grade', {
-            'value': 33,
+            'value': 2,
             'max_value': 100,
             'user_id': module.student.id
         })
