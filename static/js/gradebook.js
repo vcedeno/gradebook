@@ -13,7 +13,7 @@ function GradeBookBlock(runtime, element) {
             }
         });
 		$.post(runtime.handlerUrl(element, 'enter_grade'), form.serialize()).success();
-        
+  
     }
 
     player.addEvent('ready', function() {

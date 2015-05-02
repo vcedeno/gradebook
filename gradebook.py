@@ -21,8 +21,27 @@ class GradeBookBlock(XBlock):
     maxheight = Integer(help="Maximum height of the video", default=450, scope=Scope.content)
     watched_count = Integer(help="The number of times the student watched the video", default=0, scope=Scope.user_state)
 
-	
+    weight = Integer(
+        display_name="Problem Weight",
+        help=("Defines the number of points each problem is worth. "
+              "If the value is not set, the problem is worth the sum of the "
+              "option point values."),
+        values={"min": 0, "step": 1 },
+        scope=Scope.settings
+    )
 
+    points = Integer(
+        display_name="Maximum score",
+        help=("Maximum grade score given to assignment by staff."),
+        default=100,
+        scope=Scope.settings
+    )
+    
+    def max_score(self):
+        """
+        Return the maximum score possible.
+        """
+        return self.points
     def student_view(self, context):
         """
         Create a fragment used to display the XBlock to a student.
@@ -142,13 +161,12 @@ class GradeBookBlock(XBlock):
         #assert self.is_course_staff()
         module = StudentModule.objects.get(pk=request.params['module_id'])
         state = json.loads(module.state)
-        state['score'] = watched_count
+        state['score'] = 13
         state['score_published'] = True    # see student_view
         module.state = json.dumps(state)
 
-        # This is how we'd like to do it.  See student_view
         self.runtime.publish(self, 'grade', {
-            'value': state['score'],
+            'value': 33,
             'max_value': 100,
             'user_id': module.student.id
         })
