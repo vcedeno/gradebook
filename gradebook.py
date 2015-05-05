@@ -1,10 +1,11 @@
 import pkg_resources
 import requests
+import json
 
 from urlparse import urlparse
 
 from xblock.core import XBlock
-from xblock.fields import Scope, Integer, String
+from xblock.fields import Scope, Integer, String, Float, Boolean, DateTime
 from xblock.fragment import Fragment
 from courseware.models import StudentModule
 from submissions import api as submissions_api
@@ -35,6 +36,13 @@ class GradeBookBlock(XBlock):
         help=("Maximum grade score given to assignment by staff."),
         default=100,
         scope=Scope.settings
+    )
+    
+    score_published = Boolean(
+        display_name="Whether score has been published.",
+        help=("help."),
+        default=True,
+        scope=Scope.user_state
     )
     
     def max_score(self):
@@ -133,46 +141,16 @@ class GradeBookBlock(XBlock):
 
         return {'watched_count': self.watched_count}
 
-
-	def staff_grading_data(self):
-		def get_student_data(module):
-			state = json.loads(module.state)
-			return {
-				'module_id': module.id,
-				'username': module.student.username,
-				'fullname': module.student.profile.name,
-				'filename': state.get("uploaded_filename"),
-				'timestamp': state.get("uploaded_timestamp"),
-				'published': state.get("score_published"),
-				'score': state.get("score"),
-				'annotated': state.get("annotated_filename"),
-				'comment': state.get("comment", ''),
-			}
-		query = StudentModule.objects.filter(
-			course_id=self.xmodule_runtime.course_id,
-			module_state_key=self.location.url())
-		return {
-			'assignments': [get_student_data(module) for module in query],
-			'max_score': self.max_score(),
-		}
         
     @XBlock.handler
     def enter_grade(self, request, suffix=''):
-        #assert self.is_course_staff()
-        module = StudentModule.objects.get(pk=request.params['module_id'])
-        state = json.loads(module.state)
-        state['score'] = watched_count
-        state['score_published'] = True    # see student_view
-        module.state = json.dumps(state)
-
+        
         self.runtime.publish(self, 'grade', {
-            'value': 2,
+            'value': 33,
             'max_value': 100,
-            'user_id': module.student.id
         })
-
-        module.save()
-        return Response(json_body=self.staff_grading_data())
+        self.score_published = True
+        return {'result': 'success'}
 
     @staticmethod
     def workbench_scenarios():

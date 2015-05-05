@@ -12,15 +12,20 @@ function GradeBookBlock(runtime, element) {
                 watched_status.text(result.watched_count);
             }
         });
-		$.post(runtime.handlerUrl(element, 'enter_grade'), form.serialize()).success();
-  
+        
+        $.ajax({
+            type: "POST",
+            url: runtime.handlerUrl(element, 'enter_grade'),
+            data: JSON.stringify(id),
+            success: on_finish
+        });
+
     }
 
     player.addEvent('ready', function() {
         player.addEvent('finish', on_finish);
     });
-    
-    
+     
 }
 
 $(document).ready(function() {
