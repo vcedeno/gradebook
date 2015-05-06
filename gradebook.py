@@ -146,7 +146,7 @@ class GradeBookBlock(XBlock):
     def enter_grade(self, request, suffix=''):
         
         self.runtime.publish(self, 'grade', {
-            'value': 33,
+            'value': 60,
             'max_value': 100,
         })
         self.score_published = True

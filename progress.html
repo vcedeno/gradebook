@@ -1,0 +1,267 @@
+<%! from django.utils.translation import ugettext as _ %>
+<%inherit file="/main.html" />
+<%namespace name='static' file='/static_content.html'/>
+
+
+<%block name="headextra">
+<%static:css group='style-course-vendor'/>
+<%static:css group='style-course'/>
+</%block>
+
+<%namespace name="progress_graph" file="/courseware/progress_graph.js"/>
+
+<%block name="pagetitle">${_("{course_number} Progress").format(course_number=course.display_number_with_default) | h}</%block>
+<%block name="nav_skip">#course-info-progress</%block>
+
+<%!
+    from django.core.urlresolvers import reverse
+%>
+
+<%!
+from util.date_utils import get_time_display
+from django.conf import settings
+from django.utils.http import urlquote_plus
+%>
+
+<%block name="js_extra">
+
+
+<script type="text/javascript" src="${static.url('js/vendor/flot/jquery.flot.js')}"></script>
+<script type="text/javascript" src="${static.url('js/vendor/flot/jquery.flot.stack.js')}"></script>
+<script type="text/javascript" src="${static.url('js/vendor/flot/jquery.flot.symbol.js')}"></script>
+<script type="text/javascript" src="${static.url('js/courseware/certificates_api.js')}"></script>
+<script>
+  ${progress_graph.body(grade_summary, course.grade_cutoffs, "grade-detail-graph", not course.no_grade, not course.no_grade)}
+</script>
+
+
+</%block>
+
+<%include file="/dashboard/_dashboard_prompt_midcourse_reverify.html" />
+
+<%include file="/courseware/course_navigation.html" args="active_page='progress'" />
+
+<div class="container">
+  <div class="profile-wrapper">
+
+    <div class="course-info" id="course-info-progress" aria-label="${_('Course Progress')}">
+      % if staff_access and studio_url is not None:
+        <div class="wrap-instructor-info">
+          <a class="instructor-info-action studio-view" href="${studio_url}">${_("View Grading in studio")}</a>
+        </div>
+      % endif
+
+			<%
+              totalChapters = 0
+              totalHomeworks = 0
+              %>
+      <div class="chapters" >
+      
+        %for chapter in courseware_summary:
+        %if not chapter['display_name'] == "hidden":
+            <%
+              total = 0
+              %>
+            %for section in chapter['sections']:
+            %if section['graded']:
+              <%
+              total = total+ section['section_total'].possible
+              %>
+            %endif
+            %if section['format']== 'Homework':
+            <%
+              totalChapters = 1
+              %>
+            %endif
+            
+            %endfor
+            
+        %if total > 0 :
+        <section>    
+          <h2>
+			${ chapter['display_name'] }
+          </h2>
+          <div class="sections" >
+            %for section in chapter['sections']:
+            <div>
+              <%
+              earned = section['section_total'].earned
+              total = section['section_total'].possible
+              percentageString = "{0:.0%}".format( float(earned)/total) if total > 0 else ""
+              totalHomeworks=totalHomeworks+float(earned)
+              %>
+              %if total > 0:
+              <%
+              totalHomeworks=totalHomeworks+(earned/total)*100
+              %>
+              
+              %endif
+              
+			  %if section['graded']:
+              <h3><a href="${reverse('courseware_section', kwargs=dict(course_id=course.id.to_deprecated_string(), chapter=chapter['url_name'], section=section['url_name']))}">
+                ${ section['display_name'] }
+                %if total > 0 :
+                  <span class="sr">
+                    ${_("{earned:.3n} of {total:.3n} possible points").format( earned = float(earned), total = float(total) )}
+                  </span>
+                %endif
+                </a>
+                %if total > 0 :
+                  <span> ${"({0:.3n}/{1:.3n}) {2}".format( float(earned), float(total), percentageString )}</span>
+                %endif
+              </h3>
+              %endif
+              <div> 
+              <p>
+                ${section['format']}
+
+                %if section.get('due') is not None:
+                  <%
+                      formatted_string = get_time_display(section['due'], course.due_date_display_format, coerce_tz=settings.TIME_ZONE_DISPLAYED_FOR_DEADLINES)
+                      due_date = '' if len(formatted_string)==0 else _(u'due {date}').format(date=formatted_string)
+                  %>
+                  <em>
+                  ${due_date}
+                  </em>
+                %endif
+              </p>
+			</div> 
+              <div class="scores">
+                %if len(section['scores']) > 0 and section['graded']:
+                  <h3> ${ _("Problem Scores: ") if section['graded'] else _("Practice Scores: ")} </h3>
+                  <ol>
+                    %for score in section['scores']:
+                    <li>${"{0:.3n}/{1:.3n}".format(float(score.earned),float(score.possible))}</li>
+                    %endfor
+                  </ol>
+                %endif
+              </div>
+
+
+            </div> <!--End section-->
+            %endfor
+          </div> <!--End sections-->
+        </section> <!--End chapter-->
+         <%
+              totalChapters = totalChapters+1
+              %>
+        %endif
+        %endif
+        %endfor
+      </div> <!--End chapters-->
+	
+
+
+      <header class="progress-certificates">
+        <h1 class="progress-certificates-title">${_("Course Progress for Student '{username}' ({email})").format(username=student.username, email=student.email)}</h1>
+      </header>
+
+        %if show_generate_cert_btn:
+        <div class="wrapper-msg wrapper-auto-cert">
+            <div id="errors-info" class="errors-info"></div>
+
+            <div class="auto-cert-message" id="course-success">
+                <div class="has-actions">
+                %if passed:
+                    % if is_downloadable and download_url:
+                    <div class="msg-content">
+                        <h2 class="title">${_("Your certificate is available")}</h2>
+                        <p class="copy">${_("You can now download your certificate as a PDF. If you keep working and receive a higher grade, you can request an updated certificate.")}</p>
+                    </div>
+                    <div class="msg-actions">
+                        <a class="btn" href="${download_url}" target="_blank" title="${_('PDF will open in a new browser window or tab.')}">
+                            ${_("Download Your Certificate")}
+                        </a>
+                    </div>
+                    %elif is_generating:
+                    <div class="msg-content">
+                        <h2 class="title">${_("We're working on it...")}</h2>
+                        <p class="copy">${_("We're creating your certificate. You can keep working in your courses and a link to it will appear here and on your Dashboard when it is ready.")}</p>
+                    </div>
+                    <div class="msg-actions"></div>
+                    %else:
+                    <div class="msg-content">
+                        <h2 class="title">${_("Congratulations, you qualified for a certificate!")}</h2>
+                        <p class="copy">${_("You can keep working for a higher grade, or request your certificate now.")}</p>
+                    </div>
+                    <div class="msg-actions">
+                        <button class="btn" data-endpoint="${reverse('generate_user_cert', args=[unicode(course.id)])}" id="btn_generate_cert">${_('Request Certificate')}</button>
+                    </div>
+                    %endif
+                </div>
+                %endif
+            </div>
+        </div>
+        %endif
+
+      %if not course.disable_progress_graph:
+        <div class="grade-detail-graph" id="grade-detail-graph" aria-hidden="true"></div>
+      %endif
+
+      <div class="chapters">
+        %for chapter in courseware_summary:
+        %if not chapter['display_name'] == "hidden":
+        <section>
+          <h2>${ chapter['display_name'] }</h2>
+
+          <div class="sections">
+            %for section in chapter['sections']:
+            <div>
+              <%
+              earned = section['section_total'].earned
+              total = section['section_total'].possible
+              percentageString = "{0:.0%}".format( float(earned)/total) if total > 0 else ""
+              %>
+
+              <h3><a href="${reverse('courseware_section', kwargs=dict(course_id=course.id.to_deprecated_string(), chapter=chapter['url_name'], section=section['url_name']))}">
+                ${ section['display_name'] }
+                %if total > 0 :
+                  <span class="sr">
+                    ${_("{earned:.3n} of {total:.3n} possible points").format( earned = float(earned), total = float(total) )}
+                  </span>
+                %endif
+                </a>
+                %if total > 0 :
+                  <span> ${"({0:.3n}/{1:.3n}) {2}".format( float(earned), float(total), percentageString )}</span>
+                %endif
+              </h3>
+              <p>
+                ${section['format']}
+
+                %if section.get('due') is not None:
+                  <%
+                      formatted_string = get_time_display(section['due'], course.due_date_display_format, coerce_tz=settings.TIME_ZONE_DISPLAYED_FOR_DEADLINES)
+                      due_date = '' if len(formatted_string)==0 else _(u'due {date}').format(date=formatted_string)
+                  %>
+                  <em>
+                  ${due_date}
+                  </em>
+                %endif
+              </p>
+
+              <div class="scores">
+                %if len(section['scores']) > 0:
+                  <h3> ${ _("Problem Scores: ") if section['graded'] else _("Practice Scores: ")} </h3>
+                  <ol>
+                    %for score in section['scores']:
+                    <li>${"{0:.3n}/{1:.3n}".format(float(score.earned),float(score.possible))}</li>
+                    %endfor
+                  </ol>
+                %else:
+                  <h3 class="no-scores"> ${_("No problem scores in this section")} </h3>
+                %endif
+              </div>
+
+
+            </div> <!--End section-->
+            %endfor
+          </div> <!--End sections-->
+        </section> <!--End chapter-->
+        %endif
+        %endfor
+      </div> <!--End chapters-->
+
+    </div>
+  </div>
+</div>
+
